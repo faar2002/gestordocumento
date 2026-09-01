@@ -3,9 +3,14 @@ package developer.fullstack.gestordocumento.dto;
 import java.util.Set;
 import java.util.UUID;
 
+
 public record UserRequestDTO(
-    String fullName,
+    String firstName,
+    String middleName,
+    String lastName,
+    String secondLastName,
     String email,
+    String password,
     UUID companyId,
     Set<UUID> systemIds
 ) {}
