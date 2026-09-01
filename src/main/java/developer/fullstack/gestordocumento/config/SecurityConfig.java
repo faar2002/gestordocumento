@@ -23,7 +23,8 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").permitAll() // Permite acceso libre a las rutas API mientras desarrollas
+                .requestMatchers("/api/v1/auth/**").permitAll() // Habilita las rutas de autenticación
+                .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             );
         return http.build();

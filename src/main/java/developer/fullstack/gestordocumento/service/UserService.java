@@ -11,5 +11,6 @@ public interface UserService {
     UserResponseDTO findById(UUID id);
     List<UserResponseDTO> findAll();
     UserResponseDTO update(UUID id, UserRequestDTO dto);
+    UserResponseDTO toggleUserStatus(UUID id, boolean enabled);
     void delete(UUID id);
 }

@@ -1,16 +1,9 @@
 package developer.fullstack.gestordocumento.service.impl;
 
-import developer.fullstack.gestordocumento.dto.CompanyDTO;
-import developer.fullstack.gestordocumento.dto.UserRequestDTO;
-import developer.fullstack.gestordocumento.dto.UserResponseDTO;
-import developer.fullstack.gestordocumento.entity.CompanyEntity;
-import developer.fullstack.gestordocumento.entity.SystemAccessEntity;
-import developer.fullstack.gestordocumento.entity.UserEntity;
-import developer.fullstack.gestordocumento.repository.CompanyRepository;
-import developer.fullstack.gestordocumento.repository.SystemAccessRepository;
-import developer.fullstack.gestordocumento.repository.UserRepository;
+import developer.fullstack.gestordocumento.dto.*;
+import developer.fullstack.gestordocumento.entity.*;
+import developer.fullstack.gestordocumento.repository.*;
 import developer.fullstack.gestordocumento.service.UserService;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -26,15 +19,18 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final SystemAccessRepository systemAccessRepository;
+    private final WorkGroupRepository workGroupRepository;
     private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserRepository userRepository,
                            CompanyRepository companyRepository,
                            SystemAccessRepository systemAccessRepository,
+                           WorkGroupRepository workGroupRepository,
                            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.systemAccessRepository = systemAccessRepository;
+        this.workGroupRepository = workGroupRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -59,6 +55,14 @@ public class UserServiceImpl implements UserService {
         if (dto.systemIds() != null && !dto.systemIds().isEmpty()) {
             List<SystemAccessEntity> systems = systemAccessRepository.findAllById(dto.systemIds());
             user.setAuthorizedSystems(new HashSet<>(systems));
+        }
+
+        // Cargar y asignar Grupos de Trabajo desde sus UUIDs
+        if (dto.workGroupIds() != null && !dto.workGroupIds().isEmpty()) {
+            List<WorkGroupEntity> workGroups = workGroupRepository.findAllById(dto.workGroupIds());
+            user.setWorkGroups(new HashSet<>(workGroups));
+        } else {
+            user.setWorkGroups(new HashSet<>());
         }
 
         return mapToDTO(userRepository.save(user));
@@ -119,22 +123,38 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserResponseDTO mapToDTO(UserEntity user) {
+        // 1. Mapeo de Empresa
         CompanyDTO companyDTO = user.getCompany() != null
-                ? new CompanyDTO(user.getCompany().getId(), user.getCompany().getName(), user.getCompany().getTaxId())
+                ? new CompanyDTO(
+                    user.getCompany().getId(), 
+                    user.getCompany().getName(), 
+                    user.getCompany().getTaxId()
+                )
                 : null;
 
+        // 2. Mapeo de Códigos de Sistemas Autorizados
         Set<String> systemCodes = user.getAuthorizedSystems() != null
-                ? user.getAuthorizedSystems().stream().map(SystemAccessEntity::getSystemCode).collect(Collectors.toSet())
+                ? user.getAuthorizedSystems().stream()
+                        .map(SystemAccessEntity::getSystemCode)
+                        .collect(Collectors.toSet())
                 : Set.of();
 
-        // Concatenación amigable para mostrar el nombre completo en tablas de Angular
+        // 3. Mapeo de Grupos de Trabajo (WorkGroupDTO con CompanyDTO embebido)
+        Set<WorkGroupDTO> workGroupDTOs = user.getWorkGroups() != null
+            ? user.getWorkGroups().stream()
+                    .map(this::mapWorkGroupToDTO)
+                    .collect(Collectors.toSet())
+            : Set.of();
+
+        // 4. Concatenación amigable del nombre completo
         String fullName = String.format("%s %s %s %s",
-                user.getFirstName(),
+                user.getFirstName() != null ? user.getFirstName() : "",
                 user.getMiddleName() != null ? user.getMiddleName() : "",
-                user.getLastName(),
+                user.getLastName() != null ? user.getLastName() : "",
                 user.getSecondLastName() != null ? user.getSecondLastName() : ""
         ).replaceAll("\\s+", " ").trim();
 
+        // 5. Retorno del DTO de respuesta
         return new UserResponseDTO(
                 user.getId(),
                 user.getFirstName(),
@@ -143,8 +163,31 @@ public class UserServiceImpl implements UserService {
                 user.getSecondLastName(),
                 fullName,
                 user.getEmail(),
+                user.getEnabled(),
                 companyDTO,
-                systemCodes
+                systemCodes,
+                workGroupDTOs
         );
+    }
+
+    private WorkGroupDTO mapWorkGroupToDTO(WorkGroupEntity group) {
+        CompanyDTO companyDTO = group.getCompany() != null
+                ? new CompanyDTO(group.getCompany().getId(), group.getCompany().getName(), group.getCompany().getTaxId())
+                : null;
+
+        return new WorkGroupDTO(
+                group.getId(),
+                group.getName(),
+                group.getDescription(),
+                companyDTO
+        );
+    }
+
+    @Override
+    public UserResponseDTO toggleUserStatus(UUID id, boolean enabled) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        user.setEnabled(enabled);
+        return mapToDTO(userRepository.save(user));
     }
 }

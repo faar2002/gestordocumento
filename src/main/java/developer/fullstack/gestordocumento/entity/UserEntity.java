@@ -1,6 +1,8 @@
 package developer.fullstack.gestordocumento.entity;
 
 import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
 
@@ -28,6 +30,14 @@ public class UserEntity {
     @Column(nullable = false)
     private String password; // Se almacenará encriptada (BCrypt)
 
+    @Column(nullable = false)
+    private Integer failedAttempts = 0;
+
+    private LocalDateTime lockTime;
+
+    @Column(nullable = false)
+    private Boolean enabled = true; // Habilitado / Deshabilitado
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
     private CompanyEntity company;
@@ -39,6 +49,14 @@ public class UserEntity {
         inverseJoinColumns = @JoinColumn(name = "system_id")
     )
     private Set<SystemAccessEntity> authorizedSystems;
+
+    @ManyToMany
+    @JoinTable(
+        name = "user_work_groups",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "work_group_id")
+    )
+    private Set<WorkGroupEntity> workGroups;
 
     // Getters y Setters
     public UUID getId() { return id; }
@@ -67,4 +85,16 @@ public class UserEntity {
 
     public Set<SystemAccessEntity> getAuthorizedSystems() { return authorizedSystems; }
     public void setAuthorizedSystems(Set<SystemAccessEntity> authorizedSystems) { this.authorizedSystems = authorizedSystems; }
+
+    public Integer getFailedAttempts() { return failedAttempts; }
+    public void setFailedAttempts(Integer failedAttempts) { this.failedAttempts = failedAttempts; }
+
+    public LocalDateTime getLockTime() { return lockTime; }
+    public void setLockTime(LocalDateTime lockTime) { this.lockTime = lockTime; }
+
+    public Boolean getEnabled() { return enabled; }
+    public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+
+    public Set<WorkGroupEntity> getWorkGroups() { return workGroups; }
+    public void setWorkGroups(Set<WorkGroupEntity> workGroups) { this.workGroups = workGroups; }
 }

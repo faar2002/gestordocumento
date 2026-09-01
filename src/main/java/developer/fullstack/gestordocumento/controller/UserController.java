@@ -45,4 +45,11 @@ public class UserController {
         userService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<UserResponseDTO> toggleStatus(
+            @PathVariable UUID id,
+            @RequestParam boolean enabled) {
+        return ResponseEntity.ok(userService.toggleUserStatus(id, enabled));
+    }
 }

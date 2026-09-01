@@ -9,8 +9,10 @@ public record UserResponseDTO(
     String middleName,
     String lastName,
     String secondLastName,
-    String fullName, // Campo calculado útil para la UI
+    String fullName,
     String email,
+    Boolean enabled,
     CompanyDTO company,
-    Set<String> authorizedSystemCodes
+    Set<String> authorizedSystemCodes,
+    Set<WorkGroupDTO> workGroups
 ) {}
