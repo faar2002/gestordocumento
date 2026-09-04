@@ -1,9 +1,13 @@
 package developer.fullstack.gestordocumento.controller;
 
 import developer.fullstack.gestordocumento.dto.DocumentResponseDTO;
+import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.DocumentEntity;
 import developer.fullstack.gestordocumento.service.StorageService;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,13 +29,36 @@ public class DocumentController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DocumentResponseDTO> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam(value = "email", required = false) String email) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(storageService.upload(file,email));
+    public ResponseEntity<DocumentResponseDTO> uploadFile(
+            @RequestParam("file") MultipartFile file, 
+            @RequestParam(value = "email", required = false) String email) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(storageService.upload(file, email));
     }
 
     @GetMapping
     public ResponseEntity<List<DocumentResponseDTO>> listAllFiles() {
         return ResponseEntity.ok(storageService.listAll());
+    }
+
+    /**
+     * Nuevo Endpoint: Búsqueda paginada de documentos filtrados por correo electrónico.
+     * Compatible con tablas y paginadores de Angular.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<PageResponseDTO<DocumentResponseDTO>> searchByEmail(
+            @RequestParam String email,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "uploadedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+
+        Sort sort = direction.equalsIgnoreCase("asc") 
+                ? Sort.by(sortBy).ascending() 
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        return ResponseEntity.ok(storageService.findByEmailPaginated(email, pageable));
     }
 
     @GetMapping("/{id}/download")

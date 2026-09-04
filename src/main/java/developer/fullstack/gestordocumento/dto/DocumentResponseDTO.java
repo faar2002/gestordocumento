@@ -5,9 +5,9 @@ import java.util.UUID;
 
 public record DocumentResponseDTO(
     UUID id,
-    String fileName,
+    String originalName,
     String contentType,
-    Long size,
-    String email,
-    LocalDateTime uploadedAt
+    long size,
+    LocalDateTime uploadedAt,
+    String email
 ) {}
