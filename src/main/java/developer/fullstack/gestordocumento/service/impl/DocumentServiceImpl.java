@@ -2,8 +2,7 @@ package developer.fullstack.gestordocumento.service.impl;
 
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
-import developer.fullstack.gestordocumento.entity.DocumentEntity;
-import developer.fullstack.gestordocumento.entity.UserEntity;
+import developer.fullstack.gestordocumento.entity.*;
 import developer.fullstack.gestordocumento.repository.DocumentRepository;
 import developer.fullstack.gestordocumento.repository.UserRepository;
 import developer.fullstack.gestordocumento.service.DocumentService;

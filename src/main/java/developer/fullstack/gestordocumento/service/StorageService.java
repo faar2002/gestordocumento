@@ -3,6 +3,7 @@ package developer.fullstack.gestordocumento.service;
 import developer.fullstack.gestordocumento.dto.DocumentResponseDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.DocumentEntity;
+import developer.fullstack.gestordocumento.enums.DocumentStatus;
 
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,7 @@ import java.util.UUID;
 public interface StorageService {
     // Firma actualizada recibiendo el parámetro email
     DocumentResponseDTO upload(MultipartFile file, String email);
+    DocumentResponseDTO updateStatus(UUID id, DocumentStatus status);
     
     Resource download(UUID id);
     DocumentEntity getMetadata(UUID id);

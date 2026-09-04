@@ -3,6 +3,7 @@ package developer.fullstack.gestordocumento.service.impl;
 import developer.fullstack.gestordocumento.dto.DocumentResponseDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.*;
+import developer.fullstack.gestordocumento.enums.DocumentStatus;
 import developer.fullstack.gestordocumento.repository.DocumentRepository;
 import developer.fullstack.gestordocumento.repository.UserRepository;
 import developer.fullstack.gestordocumento.service.StorageService;
@@ -131,6 +132,16 @@ public class StorageServiceImpl implements StorageService {
                 .orElseThrow(() -> new RuntimeException("Documento no encontrado con el ID: " + id));
     }
 
+    @Override
+    public DocumentResponseDTO updateStatus(UUID id, DocumentStatus status) {
+        DocumentEntity entity = documentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Documento no encontrado con el ID: " + id));
+
+        entity.setStatus(status);
+        DocumentEntity updated = documentRepository.save(entity);
+        return mapToDTO(updated);
+    }
+    
     private DocumentResponseDTO mapToDTO(DocumentEntity entity) {
         String ownerEmail = entity.getEmail();
         if (ownerEmail == null && entity.getUploadedBy() != null) {
@@ -143,7 +154,8 @@ public class StorageServiceImpl implements StorageService {
                 entity.getContentType(),
                 entity.getSize() != null ? entity.getSize() : 0L,
                 entity.getUploadedAt(),
-                ownerEmail
+                ownerEmail,
+                entity.getStatus()
         );
     }
 }

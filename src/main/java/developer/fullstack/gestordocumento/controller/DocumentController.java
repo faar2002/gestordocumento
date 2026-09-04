@@ -3,6 +3,7 @@ package developer.fullstack.gestordocumento.controller;
 import developer.fullstack.gestordocumento.dto.DocumentResponseDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.DocumentEntity;
+import developer.fullstack.gestordocumento.enums.DocumentStatus;
 import developer.fullstack.gestordocumento.service.StorageService;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageRequest;
@@ -75,5 +76,12 @@ public class DocumentController {
     @GetMapping("/{id}/metadata")
     public ResponseEntity<DocumentEntity> getMetadata(@PathVariable UUID id) {
         return ResponseEntity.ok(storageService.getMetadata(id));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<DocumentResponseDTO> updateStatus(
+            @PathVariable UUID id,
+            @RequestParam DocumentStatus status) {
+        return ResponseEntity.ok(storageService.updateStatus(id, status));
     }
 }

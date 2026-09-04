@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import developer.fullstack.gestordocumento.enums.DocumentStatus;
+
 @Entity
 @Table(name = "documents")
 public class DocumentEntity {
@@ -35,11 +37,19 @@ public class DocumentEntity {
     @Column(updatable = false)
     private LocalDateTime uploadedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private DocumentStatus status = DocumentStatus.PENDIENTE;
+
     @PrePersist
     protected void onCreate() {
         this.uploadedAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = DocumentStatus.PENDIENTE;
+        }
     }
 
+    
     // Getters y Setters...
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -64,4 +74,7 @@ public class DocumentEntity {
 
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public DocumentStatus getStatus() { return status; }
+    public void setStatus(DocumentStatus status) { this.status = status; }
 }
