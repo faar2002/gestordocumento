@@ -3,6 +3,7 @@ package developer.fullstack.gestordocumento.entity;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,18 +18,18 @@ public class UserEntity {
     @Column(nullable = false)
     private String firstName;
 
-    private String middleName; // Opcional
+    private String middleName;
 
     @Column(nullable = false)
     private String lastName;
 
-    private String secondLastName; // Opcional
+    private String secondLastName;
 
     @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
-    private String password; // Se almacenará encriptada (BCrypt)
+    private String password;
 
     @Column(nullable = false)
     private Integer failedAttempts = 0;
@@ -36,11 +37,19 @@ public class UserEntity {
     private LocalDateTime lockTime;
 
     @Column(nullable = false)
-    private Boolean enabled = true; // Habilitado / Deshabilitado
+    private Boolean enabled = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
     private CompanyEntity company;
+
+    @ManyToMany(fetch = FetchType.EAGER) // EAGER para cargar los roles automáticamente al autenticar con Spring Security
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<RoleEntity> roles = new HashSet<>();
 
     @ManyToMany
     @JoinTable(
@@ -82,6 +91,9 @@ public class UserEntity {
 
     public CompanyEntity getCompany() { return company; }
     public void setCompany(CompanyEntity company) { this.company = company; }
+
+    public Set<RoleEntity> getRoles() { return roles; }
+    public void setRoles(Set<RoleEntity> roles) { this.roles = roles; }
 
     public Set<SystemAccessEntity> getAuthorizedSystems() { return authorizedSystems; }
     public void setAuthorizedSystems(Set<SystemAccessEntity> authorizedSystems) { this.authorizedSystems = authorizedSystems; }

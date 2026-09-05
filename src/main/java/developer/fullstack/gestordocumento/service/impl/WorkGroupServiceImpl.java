@@ -26,22 +26,45 @@ public class WorkGroupServiceImpl implements WorkGroupService {
 
     @Override
     public WorkGroupDTO create(WorkGroupRequestDTO dto) {
-        if (workGroupRepository.existsByName(dto.name())) {
-            throw new RuntimeException("Ya existe un grupo de trabajo con el nombre: " + dto.name());
+        if (dto.getCompanyId() != null && workGroupRepository.existsByNameAndCompanyId(dto.getName(), dto.getCompanyId())) {
+            throw new RuntimeException("Ya existe un grupo de trabajo con el nombre '" + dto.getName() + "' para esta empresa.");
         }
 
         WorkGroupEntity entity = new WorkGroupEntity();
-        entity.setName(dto.name());
-        entity.setDescription(dto.description());
+        entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
 
-        if (dto.companyId() != null) {
-            CompanyEntity company = companyRepository.findById(dto.companyId())
-                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada con id: " + dto.companyId()));
+        if (dto.getCompanyId() != null) {
+            CompanyEntity company = companyRepository.findById(dto.getCompanyId())
+                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada con id: " + dto.getCompanyId()));
             entity.setCompany(company);
         }
 
         WorkGroupEntity saved = workGroupRepository.save(entity);
         return mapToDTO(saved);
+    }
+
+    @Override
+    public WorkGroupDTO update(UUID id, WorkGroupRequestDTO dto) {
+        WorkGroupEntity entity = workGroupRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Grupo de trabajo no encontrado con id: " + id));
+
+        if (dto.getCompanyId() != null && workGroupRepository.existsByNameAndCompanyIdAndIdNot(dto.getName(), dto.getCompanyId(), id)) {
+            throw new RuntimeException("Ya existe un grupo de trabajo con el nombre '" + dto.getName() + "' para esta empresa.");
+        }
+
+        entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
+
+        if (dto.getCompanyId() != null) {
+            CompanyEntity company = companyRepository.findById(dto.getCompanyId())
+                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada con id: " + dto.getCompanyId()));
+            entity.setCompany(company);
+        } else {
+            entity.setCompany(null);
+        }
+
+        return mapToDTO(workGroupRepository.save(entity));
     }
 
     @Override
@@ -63,25 +86,6 @@ public class WorkGroupServiceImpl implements WorkGroupService {
         return workGroupRepository.findByCompanyId(companyId).stream()
                 .map(this::mapToDTO)
                 .toList();
-    }
-
-    @Override
-    public WorkGroupDTO update(UUID id, WorkGroupRequestDTO dto) {
-        WorkGroupEntity entity = workGroupRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Grupo de trabajo no encontrado con id: " + id));
-
-        entity.setName(dto.name());
-        entity.setDescription(dto.description());
-
-        if (dto.companyId() != null) {
-            CompanyEntity company = companyRepository.findById(dto.companyId())
-                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada con id: " + dto.companyId()));
-            entity.setCompany(company);
-        } else {
-            entity.setCompany(null);
-        }
-
-        return mapToDTO(workGroupRepository.save(entity));
     }
 
     @Override
