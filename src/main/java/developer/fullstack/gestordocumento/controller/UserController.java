@@ -3,6 +3,8 @@ package developer.fullstack.gestordocumento.controller;
 import developer.fullstack.gestordocumento.dto.UserRequestDTO;
 import developer.fullstack.gestordocumento.dto.UserResponseDTO;
 import developer.fullstack.gestordocumento.service.UserService;
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,9 +37,12 @@ public class UserController {
         return ResponseEntity.ok(userService.findById(id));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id, @RequestBody UserRequestDTO dto) {
-        return ResponseEntity.ok(userService.update(id, dto));
+    @PutMapping
+    public ResponseEntity<UserResponseDTO> updateByEmailAndCompany(
+            @RequestParam String email,
+            @RequestParam UUID companyId,
+            @Valid @RequestBody UserRequestDTO dto) {
+        return ResponseEntity.ok(userService.updateByEmailAndCompany(email, companyId, dto));
     }
 
     @DeleteMapping("/{id}")

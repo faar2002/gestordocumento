@@ -1,8 +1,9 @@
 package developer.fullstack.gestordocumento.service.impl;
 
-import developer.fullstack.gestordocumento.dto.CompanyDTO;
 import developer.fullstack.gestordocumento.dto.AuthResponseDTO;
+import developer.fullstack.gestordocumento.dto.CompanyDTO;
 import developer.fullstack.gestordocumento.dto.LoginRequestDTO;
+import developer.fullstack.gestordocumento.dto.RoleDTO;
 import developer.fullstack.gestordocumento.dto.UserResponseDTO;
 import developer.fullstack.gestordocumento.dto.WorkGroupDTO;
 import developer.fullstack.gestordocumento.entity.SystemAccessEntity;
@@ -39,7 +40,7 @@ public class AuthServiceImpl implements AuthService {
         UserEntity user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new AuthException("El correo electrónico no existe", HttpStatus.NOT_FOUND));
 
-        // 2. Validar si la cuenta está habilitada (manejo seguro de nulos)
+        // 2. Validar si la cuenta está habilitada
         if (Boolean.FALSE.equals(user.getEnabled())) {
             throw new AuthException("El usuario se encuentra deshabilitado.", HttpStatus.FORBIDDEN);
         }
@@ -68,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
         // 5. Credenciales correctas: Reiniciar intentos fallidos y quitar bloqueo si existía
         resetFailedAttempts(user);
 
-        // 6. Mapear la información del usuario para retornar al Frontend (Llamada corregida a mapToDTO)
+        // 6. Mapear la información del usuario para retornar al Frontend
         UserResponseDTO userDTO = mapToDTO(user);
 
         return new AuthResponseDTO("Inicio de sesión exitoso", userDTO);
@@ -78,7 +79,6 @@ public class AuthServiceImpl implements AuthService {
         if (user.getLockTime() == null) {
             return false;
         }
-        // Si ya pasaron los 5 minutos, desbloquea automáticamente la cuenta
         if (user.getLockTime().plusMinutes(LOCK_TIME_MINUTES).isBefore(LocalDateTime.now())) {
             user.setLockTime(null);
             user.setFailedAttempts(0);
@@ -152,7 +152,18 @@ public class AuthServiceImpl implements AuthService {
                         .collect(Collectors.toSet())
                 : Set.of();
 
-        // 4. Concatenación amigable del nombre completo
+        // 4. Mapeo de Roles a RoleDTO
+        Set<RoleDTO> roleDTOs = user.getRoles() != null
+                ? user.getRoles().stream()
+                        .map(role -> new RoleDTO(
+                                role.getId(), 
+                                role.getName(), 
+                                role.getDescription()
+                        ))
+                        .collect(Collectors.toSet())
+                : Set.of();
+
+        // 5. Concatenación amigable del nombre completo
         String fullName = String.format("%s %s %s %s",
                 user.getFirstName() != null ? user.getFirstName() : "",
                 user.getMiddleName() != null ? user.getMiddleName() : "",
@@ -160,7 +171,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getSecondLastName() != null ? user.getSecondLastName() : ""
         ).replaceAll("\\s+", " ").trim();
 
-        // 5. Retorno del DTO de respuesta
+        // 6. Retorno del DTO de respuesta con roles incluidos
         return new UserResponseDTO(
                 user.getId(),
                 user.getFirstName(),
@@ -172,7 +183,8 @@ public class AuthServiceImpl implements AuthService {
                 user.getEnabled(),
                 companyDTO,
                 systemCodes,
-                workGroupDTOs
+                workGroupDTOs,
+                roleDTOs
         );
     }
 }

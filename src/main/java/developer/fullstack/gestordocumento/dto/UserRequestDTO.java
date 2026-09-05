@@ -13,5 +13,6 @@ public record UserRequestDTO(
     String password,
     UUID companyId,
     Set<UUID> systemIds,
-    Set<UUID> workGroupIds // IDs de los grupos asignados
+    Set<UUID> workGroupIds, // IDs de los grupos asignados
+    Set<UUID> roleIds
 ) {}

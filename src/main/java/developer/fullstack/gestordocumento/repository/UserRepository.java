@@ -17,4 +17,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     
     // Buscar todos los usuarios pertenecientes a una empresa específica
     List<UserEntity> findByCompanyId(UUID companyId);
+
+    // Buscar usuario por correo electrónico e id de empresa
+    Optional<UserEntity> findByEmailAndCompanyId(String email, UUID companyId);
+
 }

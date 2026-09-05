@@ -14,5 +14,6 @@ public record UserResponseDTO(
     Boolean enabled,
     CompanyDTO company,
     Set<String> authorizedSystemCodes,
-    Set<WorkGroupDTO> workGroups
+    Set<WorkGroupDTO> workGroups,
+    Set<RoleDTO> roles
 ) {}

@@ -20,22 +20,29 @@ public class UserServiceImpl implements UserService {
     private final CompanyRepository companyRepository;
     private final SystemAccessRepository systemAccessRepository;
     private final WorkGroupRepository workGroupRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserRepository userRepository,
                            CompanyRepository companyRepository,
                            SystemAccessRepository systemAccessRepository,
                            WorkGroupRepository workGroupRepository,
+                           RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.systemAccessRepository = systemAccessRepository;
         this.workGroupRepository = workGroupRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public UserResponseDTO create(UserRequestDTO dto) {
+        if (userRepository.existsByEmail(dto.email())) {
+            throw new RuntimeException("El correo ya está registrado: " + dto.email());
+        }
+
         UserEntity user = new UserEntity();
         user.setFirstName(dto.firstName());
         user.setMiddleName(dto.middleName());
@@ -65,6 +72,14 @@ public class UserServiceImpl implements UserService {
             user.setWorkGroups(new HashSet<>());
         }
 
+        // Cargar y asignar Roles desde sus UUIDs (dto.roleIds())
+        if (dto.roleIds() != null && !dto.roleIds().isEmpty()) {
+            List<RoleEntity> roles = roleRepository.findAllById(dto.roleIds());
+            user.setRoles(new HashSet<>(roles));
+        } else {
+            user.setRoles(new HashSet<>());
+        }
+
         return mapToDTO(userRepository.save(user));
     }
 
@@ -83,16 +98,25 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserResponseDTO update(UUID id, UserRequestDTO dto) {
-        UserEntity user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con id: " + id));
+    public UserResponseDTO updateByEmailAndCompany(String email, UUID companyId, UserRequestDTO dto) {
+        UserEntity user = userRepository.findByEmailAndCompanyId(email, companyId)
+                .orElseThrow(() -> new RuntimeException(
+                        String.format("Usuario no encontrado con email '%s' para la empresa ID: %s", email, companyId)
+                ));
 
         user.setFirstName(dto.firstName());
         user.setMiddleName(dto.middleName());
         user.setLastName(dto.lastName());
         user.setSecondLastName(dto.secondLastName());
-        user.setEmail(dto.email());
         
+        // Si se permite actualizar el email, validamos que no colisione con otro usuario existente
+        if (dto.email() != null && !dto.email().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.existsByEmail(dto.email())) {
+                throw new RuntimeException("El correo ya está en uso por otro usuario: " + dto.email());
+            }
+            user.setEmail(dto.email());
+        }
+
         // Re-encriptar solo si se envió una nueva clave
         if (dto.password() != null && !dto.password().isBlank()) {
             user.setPassword(passwordEncoder.encode(dto.password()));
@@ -111,6 +135,16 @@ public class UserServiceImpl implements UserService {
             user.setAuthorizedSystems(new HashSet<>(systems));
         }
 
+        if (dto.workGroupIds() != null) {
+            List<WorkGroupEntity> workGroups = workGroupRepository.findAllById(dto.workGroupIds());
+            user.setWorkGroups(new HashSet<>(workGroups));
+        }
+
+        if (dto.roleIds() != null) {
+            List<RoleEntity> roles = roleRepository.findAllById(dto.roleIds());
+            user.setRoles(new HashSet<>(roles));
+        }
+
         return mapToDTO(userRepository.save(user));
     }
 
@@ -120,6 +154,14 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Usuario no encontrado con id: " + id);
         }
         userRepository.deleteById(id);
+    }
+
+    @Override
+    public UserResponseDTO toggleUserStatus(UUID id, boolean enabled) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        user.setEnabled(enabled);
+        return mapToDTO(userRepository.save(user));
     }
 
     private UserResponseDTO mapToDTO(UserEntity user) {
@@ -139,14 +181,21 @@ public class UserServiceImpl implements UserService {
                         .collect(Collectors.toSet())
                 : Set.of();
 
-        // 3. Mapeo de Grupos de Trabajo (WorkGroupDTO con CompanyDTO embebido)
+        // 3. Mapeo de Grupos de Trabajo
         Set<WorkGroupDTO> workGroupDTOs = user.getWorkGroups() != null
             ? user.getWorkGroups().stream()
                     .map(this::mapWorkGroupToDTO)
                     .collect(Collectors.toSet())
             : Set.of();
 
-        // 4. Concatenación amigable del nombre completo
+        // 4. Mapeo de Roles a RoleDTO
+        Set<RoleDTO> roleDTOs = user.getRoles() != null
+            ? user.getRoles().stream()
+                    .map(role -> new RoleDTO(role.getId(), role.getName(), role.getDescription()))
+                    .collect(Collectors.toSet())
+            : Set.of();
+
+        // 5. Concatenación amigable del nombre completo
         String fullName = String.format("%s %s %s %s",
                 user.getFirstName() != null ? user.getFirstName() : "",
                 user.getMiddleName() != null ? user.getMiddleName() : "",
@@ -154,7 +203,7 @@ public class UserServiceImpl implements UserService {
                 user.getSecondLastName() != null ? user.getSecondLastName() : ""
         ).replaceAll("\\s+", " ").trim();
 
-        // 5. Retorno del DTO de respuesta
+        // 6. Retorno del DTO de respuesta
         return new UserResponseDTO(
                 user.getId(),
                 user.getFirstName(),
@@ -166,7 +215,8 @@ public class UserServiceImpl implements UserService {
                 user.getEnabled(),
                 companyDTO,
                 systemCodes,
-                workGroupDTOs
+                workGroupDTOs,
+                roleDTOs
         );
     }
 
@@ -181,13 +231,5 @@ public class UserServiceImpl implements UserService {
                 group.getDescription(),
                 companyDTO
         );
-    }
-
-    @Override
-    public UserResponseDTO toggleUserStatus(UUID id, boolean enabled) {
-        UserEntity user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        user.setEnabled(enabled);
-        return mapToDTO(userRepository.save(user));
     }
 }

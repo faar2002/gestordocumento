@@ -10,7 +10,7 @@ public interface UserService {
     UserResponseDTO create(UserRequestDTO dto);
     UserResponseDTO findById(UUID id);
     List<UserResponseDTO> findAll();
-    UserResponseDTO update(UUID id, UserRequestDTO dto);
+    UserResponseDTO updateByEmailAndCompany(String email, UUID companyId, UserRequestDTO dto);
     UserResponseDTO toggleUserStatus(UUID id, boolean enabled);
     void delete(UUID id);
 }
