@@ -6,12 +6,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
+import java.util.UUID; // Importante: importar UUID
 
+@Repository
 public interface DocumentRepository extends JpaRepository<DocumentEntity, UUID> {
 
-    // Búsqueda paginada por correo (busca tanto en el campo email como en la relación uploadedBy.email)
-    @Query("SELECT d FROM DocumentEntity d WHERE LOWER(d.email) LIKE LOWER(CONCAT('%', :email, '%')) OR (d.uploadedBy IS NOT NULL AND LOWER(d.uploadedBy.email) LIKE LOWER(CONCAT('%', :email, '%')))")
-    Page<DocumentEntity> findByEmailPaginated(@Param("email") String email, Pageable pageable);
+    // Consulta directa filtrando por la empresa asociada al documento
+    Page<DocumentEntity> findByCompanyId(UUID companyId, Pageable pageable);
+
+    // Consulta directa filtrando por empresa Y por correo del usuario
+    Page<DocumentEntity> findByCompanyIdAndUploadedByEmail(UUID companyId, String email, Pageable pageable);
+
+    // Consulta filtrada solo por correo
+    Page<DocumentEntity> findByUploadedByEmail(String email, Pageable pageable);
 }

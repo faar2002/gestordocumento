@@ -9,12 +9,17 @@ import java.util.List;
 import java.util.UUID;
 
 public interface DocumentService {
+
     DocumentDTO upload(MultipartFile file, String email);
     DocumentDTO findById(UUID id);
     List<DocumentDTO> findAll();
-    
-    // Método para búsqueda por correo con paginación
+    List<DocumentDTO> findByCompanyId(UUID companyId);
+
+    // Método actualizado para búsqueda paginada con filtros opcionales (empresa y/o correo)
+    PageResponseDTO<DocumentDTO> findAllPaginated(UUID companyId, String email, Pageable pageable);
+
+    // Mantenemos este si requieres la consulta específica solo por correo con paginación
     PageResponseDTO<DocumentDTO> findByEmailPaginated(String email, Pageable pageable);
-    
+
     byte[] download(UUID id);
 }

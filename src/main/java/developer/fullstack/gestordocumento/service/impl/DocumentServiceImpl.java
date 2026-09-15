@@ -63,7 +63,13 @@ public class DocumentServiceImpl implements DocumentService {
             document.setEmail(email);
 
             if (email != null && !email.isBlank()) {
-                userRepository.findByEmail(email).ifPresent(document::setUploadedBy);
+                userRepository.findByEmail(email).ifPresent(user -> {
+                    document.setUploadedBy(user);
+                    // Asignamos la empresa automáticamente desde el usuario que sube el archivo
+                    if (user.getCompany() != null) {
+                        document.setCompany(user.getCompany());
+                    }
+                });
             }
 
             DocumentEntity savedDocument = documentRepository.save(document);
@@ -89,21 +95,45 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public List<DocumentDTO> findByCompanyId(UUID companyId) {
+        // Si no mandan companyId, puedes retornar todos o una lista vacía según tu seguridad
+        if (companyId == null) {
+            return findAll();
+        }
+        
+        // Usamos el repositorio con la propiedad directa 'company.id' o el campo que mapeaste
+        return documentRepository.findByCompanyId(companyId, Pageable.unpaged())
+            .getContent()
+            .stream()
+            .map(this::mapToDTO)
+            .toList();
+    }
+
+    @Override
+    public PageResponseDTO<DocumentDTO> findAllPaginated(UUID companyId, String email, Pageable pageable) {
+        Page<DocumentEntity> documentPage;
+
+        boolean hasCompany = companyId != null;
+        boolean hasEmail = email != null && !email.isBlank();
+
+        // Evalúa la combinación de filtros recibidos
+        if (hasCompany && hasEmail) {
+            documentPage = documentRepository.findByCompanyIdAndUploadedByEmail(companyId, email.trim(), pageable);
+        } else if (hasCompany) {
+            documentPage = documentRepository.findByCompanyId(companyId, pageable);
+        } else if (hasEmail) {
+            documentPage = documentRepository.findByUploadedByEmail(email.trim(), pageable);
+        } else {
+            documentPage = documentRepository.findAll(pageable);
+        }
+
+        return buildPageResponse(documentPage);
+    }
+
+    @Override
     public PageResponseDTO<DocumentDTO> findByEmailPaginated(String email, Pageable pageable) {
-        Page<DocumentEntity> documentPage = documentRepository.findByEmailPaginated(email, pageable);
-
-        List<DocumentDTO> content = documentPage.getContent().stream()
-                .map(this::mapToDTO)
-                .toList();
-
-        return new PageResponseDTO<>(
-                content,
-                documentPage.getNumber(),
-                documentPage.getSize(),
-                documentPage.getTotalElements(),
-                documentPage.getTotalPages(),
-                documentPage.isLast()
-        );
+        // Redirige al nuevo método unificado manteniendo compatibilidad
+        return findAllPaginated(null, email, pageable);
     }
 
     @Override
@@ -119,6 +149,21 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
+    private PageResponseDTO<DocumentDTO> buildPageResponse(Page<DocumentEntity> documentPage) {
+        List<DocumentDTO> content = documentPage.getContent().stream()
+                .map(this::mapToDTO)
+                .toList();
+
+        return new PageResponseDTO<>(
+                content,
+                documentPage.getNumber(),
+                documentPage.getSize(),
+                documentPage.getTotalElements(),
+                documentPage.getTotalPages(),
+                documentPage.isLast()
+        );
+    }
+
     private DocumentDTO mapToDTO(DocumentEntity entity) {
         String ownerEmail = entity.getEmail();
         if (ownerEmail == null && entity.getUploadedBy() != null) {
@@ -131,7 +176,10 @@ public class DocumentServiceImpl implements DocumentService {
                 entity.getContentType(),
                 entity.getSize() != null ? entity.getSize() : 0L,
                 entity.getUploadedAt(),
-                ownerEmail
+                entity.getUploaderEmail(),
+                ownerEmail,
+                entity.getStatus() != null ? entity.getStatus().name() : "PENDIENTE",
+                entity.getCompany() != null ? entity.getCompany().getId().toString() : null
         );
     }
 }
