@@ -93,7 +93,7 @@ public class StorageServiceImpl implements StorageService {
 
     @Override
     public PageResponseDTO<DocumentResponseDTO> findByEmailPaginated(String email, Pageable pageable) {
-        Page<DocumentEntity> page = documentRepository.findByEmailPaginated(email, pageable);
+        Page<DocumentEntity> page = documentRepository.findByUploadedByEmail(email, pageable);
 
         List<DocumentResponseDTO> content = page.getContent().stream()
                 .map(this::mapToDTO)

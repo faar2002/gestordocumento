@@ -1,10 +1,10 @@
 package developer.fullstack.gestordocumento.controller;
 
-import developer.fullstack.gestordocumento.dto.DocumentResponseDTO;
+import developer.fullstack.gestordocumento.dto.DocumentDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.DocumentEntity;
 import developer.fullstack.gestordocumento.enums.DocumentStatus;
-import developer.fullstack.gestordocumento.service.StorageService;
+import developer.fullstack.gestordocumento.service.DocumentService;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,31 +23,36 @@ import java.util.UUID;
 @RequestMapping("/api/v1/documents")
 public class DocumentController {
 
-    private final StorageService storageService;
+    private final DocumentService documentService;
 
-    public DocumentController(StorageService storageService) {
-        this.storageService = storageService;
+    public DocumentController(DocumentService documentService) {
+        this.documentService = documentService;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DocumentResponseDTO> uploadFile(
+    public ResponseEntity<DocumentDTO> uploadFile(
             @RequestParam("file") MultipartFile file, 
             @RequestParam(value = "email", required = false) String email) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(storageService.upload(file, email));
+        return ResponseEntity.status(HttpStatus.CREATED).body(documentService.upload(file, email));
     }
 
     @GetMapping
-    public ResponseEntity<List<DocumentResponseDTO>> listAllFiles() {
-        return ResponseEntity.ok(storageService.listAll());
+    public ResponseEntity<PageResponseDTO<DocumentDTO>> listAllFilesPaginated(
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by("uploadedAt").descending());
+        return ResponseEntity.ok(documentService.findAllPaginated(companyId, null, pageable));
     }
 
     /**
-     * Nuevo Endpoint: Búsqueda paginada de documentos filtrados por correo electrónico.
-     * Compatible con tablas y paginadores de Angular.
+     * Búsqueda paginada flexible: admite filtrado opcional por empresa, correo o ambos.
      */
     @GetMapping("/search")
-    public ResponseEntity<PageResponseDTO<DocumentResponseDTO>> searchByEmail(
-            @RequestParam String email,
+    public ResponseEntity<PageResponseDTO<DocumentDTO>> searchDocuments(
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(required = false) String email,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "uploadedAt") String sortBy,
@@ -59,29 +64,45 @@ public class DocumentController {
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return ResponseEntity.ok(storageService.findByEmailPaginated(email, pageable));
+        return ResponseEntity.ok(documentService.findAllPaginated(companyId, email, pageable));
     }
 
-    @GetMapping("/{id}/download")
+   @GetMapping("/{id}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable UUID id) {
-        Resource resource = storageService.download(id);
-        DocumentEntity metadata = storageService.getMetadata(id);
+        byte[] data = documentService.download(id);
+        DocumentDTO metadata = documentService.findById(id);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(metadata.getContentType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + metadata.getOriginalName() + "\"")
-                .body(resource);
+                .contentType(MediaType.parseMediaType(metadata.fileType())) // Acceso directo al campo record
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + metadata.fileName() + "\"") // Acceso directo al campo record
+                .body(new org.springframework.core.io.ByteArrayResource(data));
     }
 
     @GetMapping("/{id}/metadata")
-    public ResponseEntity<DocumentEntity> getMetadata(@PathVariable UUID id) {
-        return ResponseEntity.ok(storageService.getMetadata(id));
+    public ResponseEntity<DocumentDTO> getMetadata(@PathVariable UUID id) {
+        return ResponseEntity.ok(documentService.findById(id));
     }
 
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<DocumentResponseDTO> updateStatus(
-            @PathVariable UUID id,
-            @RequestParam DocumentStatus status) {
-        return ResponseEntity.ok(storageService.updateStatus(id, status));
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<byte[]> previewDocument(@PathVariable UUID id) {
+        // Buscamos el documento en la base de datos para obtener su tipo y nombre
+        DocumentDTO document = documentService.findById(id); 
+        byte[] fileBytes = documentService.download(id); // Reutilizamos tu método de lectura
+
+        // Determinar el Content-Type (por defecto application/octet-stream si viene nulo)
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            if (document.fileType() != null && !document.fileType().isBlank()) {
+                mediaType = MediaType.parseMediaType(document.fileType());
+            }
+        } catch (Exception e) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                // Usamos "inline" para que el navegador intente abrirlo en lugar de descargarlo
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + document.fileName() + "\"")
+                .body(fileBytes);
     }
 }

@@ -25,7 +25,11 @@ public class DocumentEntity {
 
     private Long size;
 
-    // 1. Campo email agregado al documento
+    // Correo de la persona que realizó la carga física del documento
+    @Column(name = "uploader_email")
+    private String uploaderEmail;
+
+    // Correo del dueño o propietario al que le pertenece el documento
     @Column(name = "owner_email")
     private String email;
 
@@ -40,6 +44,10 @@ public class DocumentEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private DocumentStatus status = DocumentStatus.PENDIENTE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id") // Columna en la base de datos que guardará el ID de la empresa
+    private CompanyEntity company;
 
     @PrePersist
     protected void onCreate() {
@@ -66,6 +74,9 @@ public class DocumentEntity {
     public Long getSize() { return size; }
     public void setSize(Long size) { this.size = size; }
 
+    public String getUploaderEmail() { return uploaderEmail; }
+    public void setUploaderEmail(String uploaderEmail) { this.uploaderEmail = uploaderEmail; }
+
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
@@ -77,4 +88,7 @@ public class DocumentEntity {
 
     public DocumentStatus getStatus() { return status; }
     public void setStatus(DocumentStatus status) { this.status = status; }
+
+    public CompanyEntity getCompany() { return company; }
+    public void setCompany(CompanyEntity company) { this.company = company; }
 }
