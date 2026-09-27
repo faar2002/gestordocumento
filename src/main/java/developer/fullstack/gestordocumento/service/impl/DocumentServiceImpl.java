@@ -33,7 +33,10 @@ public class DocumentServiceImpl implements DocumentService {
             @Value("${file.upload-dir:uploads}") String uploadDir) {
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
-        this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+        
+        // Protección contra nulos para cuando Mockito instancia la clase en las pruebas
+        String safeDir = (uploadDir != null && !uploadDir.isBlank()) ? uploadDir : "uploads";
+        this.fileStorageLocation = Paths.get(safeDir).toAbsolutePath().normalize();
 
         try {
             Files.createDirectories(this.fileStorageLocation);
@@ -96,12 +99,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<DocumentDTO> findByCompanyId(UUID companyId) {
-        // Si no mandan companyId, puedes retornar todos o una lista vacía según tu seguridad
         if (companyId == null) {
             return findAll();
         }
         
-        // Usamos el repositorio con la propiedad directa 'company.id' o el campo que mapeaste
         return documentRepository.findByCompanyId(companyId, Pageable.unpaged())
             .getContent()
             .stream()
@@ -116,7 +117,6 @@ public class DocumentServiceImpl implements DocumentService {
         boolean hasCompany = companyId != null;
         boolean hasEmail = email != null && !email.isBlank();
 
-        // Evalúa la combinación de filtros recibidos
         if (hasCompany && hasEmail) {
             documentPage = documentRepository.findByCompanyIdAndUploadedByEmail(companyId, email.trim(), pageable);
         } else if (hasCompany) {
@@ -132,7 +132,6 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public PageResponseDTO<DocumentDTO> findByEmailPaginated(String email, Pageable pageable) {
-        // Redirige al nuevo método unificado manteniendo compatibilidad
         return findAllPaginated(null, email, pageable);
     }
 
