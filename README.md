@@ -6,7 +6,7 @@ Sistema de gestión documental desarrollado con **Spring Boot 3** y **PostgreSQL
 
 ## 🛠️ Tecnologías Utilizadas
 
-* **Lenguaje:** Java 17+
+* **Lenguaje:** Java 25+
 * **Framework:** Spring Boot 3.3.x
 * **Persistencia:** Spring Data JPA / Hibernate
 * **Base de Datos:** PostgreSQL
