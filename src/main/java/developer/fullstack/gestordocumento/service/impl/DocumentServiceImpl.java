@@ -1,15 +1,19 @@
 package developer.fullstack.gestordocumento.service.impl;
 
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
+import developer.fullstack.gestordocumento.dto.FirmanteResponseDTO; // <-- DTO para la respuesta de firmantes
+import developer.fullstack.gestordocumento.dto.FirmanteUploadDTO; 
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.*;
 import developer.fullstack.gestordocumento.repository.DocumentRepository;
+import developer.fullstack.gestordocumento.repository.TransaccionFirmaRepository; 
 import developer.fullstack.gestordocumento.repository.UserRepository;
 import developer.fullstack.gestordocumento.service.DocumentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; 
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -25,16 +29,18 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
+    private final TransaccionFirmaRepository transaccionFirmaRepository; 
     private final Path fileStorageLocation;
 
     public DocumentServiceImpl(
             DocumentRepository documentRepository,
             UserRepository userRepository,
+            TransaccionFirmaRepository transaccionFirmaRepository, 
             @Value("${file.upload-dir:uploads}") String uploadDir) {
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
+        this.transaccionFirmaRepository = transaccionFirmaRepository;
         
-        // Protección contra nulos para cuando Mockito instancia la clase en las pruebas
         String safeDir = (uploadDir != null && !uploadDir.isBlank()) ? uploadDir : "uploads";
         this.fileStorageLocation = Paths.get(safeDir).toAbsolutePath().normalize();
 
@@ -45,8 +51,13 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
-    @Override
-    public DocumentDTO upload(MultipartFile file, String email) {
+    /**
+     * Método principal de subida adaptado para recibir y registrar los firmantes,
+     * permitiendo correos que no estén necesariamente registrados en la tabla users.
+     */
+    @Override // Asegúrate de agregar este método en la interfaz DocumentService
+    @Transactional
+    public DocumentDTO uploadWithSigners(MultipartFile file, String email, List<FirmanteUploadDTO> firmantes) {
         if (file.isEmpty()) {
             throw new RuntimeException("No se puede almacenar un archivo vacío.");
         }
@@ -68,19 +79,40 @@ public class DocumentServiceImpl implements DocumentService {
             if (email != null && !email.isBlank()) {
                 userRepository.findByEmail(email).ifPresent(user -> {
                     document.setUploadedBy(user);
-                    // Asignamos la empresa automáticamente desde el usuario que sube el archivo
                     if (user.getCompany() != null) {
                         document.setCompany(user.getCompany());
                     }
                 });
             }
 
+            // Guardamos el documento principal primero para obtener su ID
             DocumentEntity savedDocument = documentRepository.save(document);
+
+            // Procesar y registrar los firmantes (incluso si no están registrados en userRepository)
+            if (firmantes != null && !firmantes.isEmpty()) {
+                for (FirmanteUploadDTO fDto : firmantes) {
+                    TransaccionFirmaEntity transaccion = new TransaccionFirmaEntity();
+                    transaccion.setDocument(savedDocument); 
+                    transaccion.setEmailFirmante(fDto.email()); 
+                    transaccion.setNombreFirmante(fDto.nombre()); 
+                    transaccion.setOrden(fDto.orden());
+                    transaccion.setEstado("PENDIENTE");
+
+                    transaccionFirmaRepository.save(transaccion);
+                }
+            }
+
             return mapToDTO(savedDocument);
 
         } catch (IOException ex) {
             throw new RuntimeException("Error al almacenar el archivo " + originalFileName, ex);
         }
+    }
+
+    // Método original mantenido por compatibilidad
+    @Override
+    public DocumentDTO upload(MultipartFile file, String email) {
+        return uploadWithSigners(file, email, null);
     }
 
     @Override
@@ -169,6 +201,18 @@ public class DocumentServiceImpl implements DocumentService {
             ownerEmail = entity.getUploadedBy().getEmail();
         }
 
+        // Consultamos y mapeamos los firmantes asociados a este documento
+        List<FirmanteResponseDTO> firmantesDTO = transaccionFirmaRepository.findByDocumentId(entity.getId())
+                .stream()
+                .map(f -> new FirmanteResponseDTO(
+                        f.getUuid(),
+                        f.getNombreFirmante(),
+                        f.getEmailFirmante(),
+                        f.getOrden(),
+                        f.getEstado()
+                ))
+                .toList();
+
         return new DocumentDTO(
                 entity.getId(),
                 entity.getOriginalName(),
@@ -178,7 +222,8 @@ public class DocumentServiceImpl implements DocumentService {
                 entity.getUploaderEmail(),
                 ownerEmail,
                 entity.getStatus() != null ? entity.getStatus().name() : "PENDIENTE",
-                entity.getCompany() != null ? entity.getCompany().getId().toString() : null
+                entity.getCompany() != null ? entity.getCompany().getId().toString() : null,
+                firmantesDTO // <-- Incluye la lista de firmantes en la respuesta
         );
     }
 }

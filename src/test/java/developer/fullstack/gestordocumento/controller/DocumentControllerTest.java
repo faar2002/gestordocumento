@@ -2,6 +2,8 @@ package developer.fullstack.gestordocumento.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
+import developer.fullstack.gestordocumento.dto.DocumentUploadRequestDTO;
+import developer.fullstack.gestordocumento.dto.FirmanteUploadDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.service.DocumentService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.test.context.support.WithMockUser; // <-- Importante
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -25,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(DocumentController.class)
-@WithMockUser(username = "admin@empresa.com", roles = {"ADMIN"}) // <-- Salta la seguridad simulando un usuario autenticado
+@WithMockUser(username = "admin@empresa.com", roles = {"ADMIN"})
 class DocumentControllerTest {
 
     @Autowired
@@ -46,6 +48,7 @@ class DocumentControllerTest {
         documentId = UUID.randomUUID();
         companyId = UUID.randomUUID();
 
+        // Se incluye el nuevo parámetro de firmantes (List.of() vacío para pruebas básicas)
         documentDTO = new DocumentDTO(
                 documentId,
                 "contrato.pdf",
@@ -55,12 +58,14 @@ class DocumentControllerTest {
                 "admin@empresa.com",
                 "propietario@empresa.com",
                 "ACTIVE",
-                companyId.toString()
+                companyId.toString(),
+                List.of() 
         );
     }
 
     @Test
-    void uploadFile_ShouldReturnCreated_WhenFileIsValid() throws Exception {
+    void uploadFile_ShouldReturnCreated_WhenFileAndSignersAreValid() throws Exception {
+        // Archivo binario simulado
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "contrato.pdf",
@@ -68,17 +73,32 @@ class DocumentControllerTest {
                 "contenido de prueba".getBytes()
         );
 
-        when(documentService.upload(any(), eq("admin@empresa.com"))).thenReturn(documentDTO);
+        // Objeto DTO que simula la data JSON enviada por @RequestPart("data")
+        DocumentUploadRequestDTO uploadRequest = new DocumentUploadRequestDTO(
+                List.of(new FirmanteUploadDTO("Juan Pérez", "juan@externo.com", 1))
+        );
+
+        // Parte JSON convertida a MockMultipartFile con application/json
+        MockMultipartFile dataPart = new MockMultipartFile(
+                "data",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsString(uploadRequest).getBytes()
+        );
+
+        // Mockeamos la llamada al servicio adaptado con firmantes
+        when(documentService.uploadWithSigners(any(), eq("admin@empresa.com"), any())).thenReturn(documentDTO);
 
         mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(file)
+                        .file(dataPart) // Se adjunta la parte de datos JSON
                         .param("email", "admin@empresa.com"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(documentId.toString()))
                 .andExpect(jsonPath("$.fileName").value("contrato.pdf"))
                 .andExpect(jsonPath("$.fileType").value("application/pdf"));
 
-        verify(documentService, times(1)).upload(any(), eq("admin@empresa.com"));
+        verify(documentService, times(1)).uploadWithSigners(any(), eq("admin@empresa.com"), any());
     }
 
     @Test

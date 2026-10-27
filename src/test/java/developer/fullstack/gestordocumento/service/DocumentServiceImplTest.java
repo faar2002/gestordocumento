@@ -1,11 +1,14 @@
 package developer.fullstack.gestordocumento.service;
 
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
+import developer.fullstack.gestordocumento.dto.FirmanteUploadDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.entity.CompanyEntity;
 import developer.fullstack.gestordocumento.entity.DocumentEntity;
+import developer.fullstack.gestordocumento.entity.TransaccionFirmaEntity;
 import developer.fullstack.gestordocumento.entity.UserEntity;
 import developer.fullstack.gestordocumento.repository.DocumentRepository;
+import developer.fullstack.gestordocumento.repository.TransaccionFirmaRepository; // <-- Importado
 import developer.fullstack.gestordocumento.repository.UserRepository;
 import developer.fullstack.gestordocumento.service.impl.DocumentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,9 @@ class DocumentServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private TransaccionFirmaRepository transaccionFirmaRepository; // <-- Nuevo mock necesario
+
     @InjectMocks
     private DocumentServiceImpl documentService;
 
@@ -59,7 +65,6 @@ class DocumentServiceImplTest {
         documentEntity.setContentType("application/pdf");
         documentEntity.setSize(2048L);
         documentEntity.setUploaderEmail("faponte@yopmail.com");
-        // Establecemos un archivo temporal ficticio para simular la ruta en disco
         documentEntity.setStoragePath("uploads/test_file.pdf");
         documentEntity.setCompany(company);
     }
@@ -67,6 +72,8 @@ class DocumentServiceImplTest {
     @Test
     void findById_ShouldReturnDocumentDTO_WhenDocumentExists() {
         when(documentRepository.findById(documentId)).thenReturn(Optional.of(documentEntity));
+        // Simulamos la búsqueda de firmantes vacía para el mapeo a DTO
+        when(transaccionFirmaRepository.findByDocumentId(documentId)).thenReturn(List.of());
 
         DocumentDTO result = documentService.findById(documentId);
 
@@ -75,6 +82,7 @@ class DocumentServiceImplTest {
         assertEquals("comandos_python.pdf", result.fileName());
         assertEquals("faponte@yopmail.com", result.uploaderEmail());
         verify(documentRepository, times(1)).findById(documentId);
+        verify(transaccionFirmaRepository, times(1)).findByDocumentId(documentId);
     }
 
     @Test
@@ -92,6 +100,7 @@ class DocumentServiceImplTest {
     @Test
     void findAll_ShouldReturnListOfDocuments() {
         when(documentRepository.findAll()).thenReturn(List.of(documentEntity));
+        when(transaccionFirmaRepository.findByDocumentId(documentId)).thenReturn(List.of());
 
         List<DocumentDTO> results = documentService.findAll();
 
@@ -105,6 +114,7 @@ class DocumentServiceImplTest {
     void findByCompanyId_ShouldReturnList_WhenCompanyIdIsProvided() {
         Page<DocumentEntity> page = new PageImpl<>(List.of(documentEntity));
         when(documentRepository.findByCompanyId(eq(companyId), any(Pageable.class))).thenReturn(page);
+        when(transaccionFirmaRepository.findByDocumentId(documentId)).thenReturn(List.of());
 
         List<DocumentDTO> results = documentService.findByCompanyId(companyId);
 
@@ -116,6 +126,7 @@ class DocumentServiceImplTest {
     @Test
     void findByCompanyId_ShouldReturnAll_WhenCompanyIdIsNull() {
         when(documentRepository.findAll()).thenReturn(List.of(documentEntity));
+        when(transaccionFirmaRepository.findByDocumentId(documentId)).thenReturn(List.of());
 
         List<DocumentDTO> results = documentService.findByCompanyId(null);
 
@@ -125,7 +136,7 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void upload_ShouldSaveAndReturnDocumentDTO_WhenFileIsValid() {
+    void uploadWithSigners_ShouldSaveDocumentAndSigners_WhenDataIsValid() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "test.txt",
@@ -136,18 +147,27 @@ class DocumentServiceImplTest {
         UserEntity user = new UserEntity();
         user.setEmail("faponte@yopmail.com");
 
+        List<FirmanteUploadDTO> firmantes = List.of(
+                new FirmanteUploadDTO("Firmante Externo", "externo@correo.com", 1)
+        );
+
         when(userRepository.findByEmail("faponte@yopmail.com")).thenReturn(Optional.of(user));
         when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(invocation -> {
             DocumentEntity doc = invocation.getArgument(0);
             doc.setId(UUID.randomUUID());
             return doc;
         });
+        when(transaccionFirmaRepository.findByDocumentId(any())).thenReturn(List.of());
 
-        DocumentDTO result = documentService.upload(file, "faponte@yopmail.com");
+        // Ejecutamos el método que incluye los firmantes
+        DocumentDTO result = documentService.uploadWithSigners(file, "faponte@yopmail.com", firmantes);
 
         assertNotNull(result);
         assertEquals("test.txt", result.fileName());
+        
+        // Verificamos que se guardó el documento y que se procesó al menos 1 transacción de firma
         verify(documentRepository, times(1)).save(any(DocumentEntity.class));
+        verify(transaccionFirmaRepository, times(1)).save(any(TransaccionFirmaEntity.class));
     }
 
     @Test
@@ -171,6 +191,7 @@ class DocumentServiceImplTest {
         Page<DocumentEntity> page = new PageImpl<>(List.of(documentEntity));
         when(documentRepository.findByCompanyIdAndUploadedByEmail(eq(companyId), eq("faponte@yopmail.com"), any(Pageable.class)))
                 .thenReturn(page);
+        when(transaccionFirmaRepository.findByDocumentId(documentId)).thenReturn(List.of());
 
         Pageable pageable = PageRequest.of(0, 10);
         PageResponseDTO<DocumentDTO> response = documentService.findAllPaginated(companyId, "faponte@yopmail.com", pageable);
@@ -182,7 +203,6 @@ class DocumentServiceImplTest {
 
     @Test
     void download_ShouldThrowException_WhenFileNotFoundOnDisk() {
-        // Asignamos una ruta que no existe físicamente
         documentEntity.setStoragePath("ruta/inexistente/archivo.pdf");
         when(documentRepository.findById(documentId)).thenReturn(Optional.of(documentEntity));
 

@@ -1,6 +1,7 @@
 package developer.fullstack.gestordocumento.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record DocumentDTO(
@@ -12,5 +13,6 @@ public record DocumentDTO(
     String uploaderEmail, // Quién lo subió
     String userEmaildb, // A quién pertenece
     String status,
-    String companyID
+    String companyID,
+    List<FirmanteResponseDTO> firmantes // <-- Nuevo campo para listar los firmantes en las respuestas
 ) {}
