@@ -1,6 +1,7 @@
 package developer.fullstack.gestordocumento.service;
 
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
+import developer.fullstack.gestordocumento.dto.FirmanteResponseDTO;
 import developer.fullstack.gestordocumento.dto.FirmanteUploadDTO; // <-- Asegúrate de importar esto
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +21,7 @@ public interface DocumentService {
     DocumentDTO findById(UUID id);
     List<DocumentDTO> findAll();
     List<DocumentDTO> findByCompanyId(UUID companyId);
+    List<FirmanteResponseDTO> obtenerFirmantesPorDocumento(UUID documentId);
     PageResponseDTO<DocumentDTO> findAllPaginated(UUID companyId, String email, Pageable pageable);
     PageResponseDTO<DocumentDTO> findByEmailPaginated(String email, Pageable pageable);
     byte[] download(UUID id);

@@ -226,4 +226,24 @@ public class DocumentServiceImpl implements DocumentService {
                 firmantesDTO // <-- Incluye la lista de firmantes en la respuesta
         );
     }
+
+    @Override
+    public List<FirmanteResponseDTO> obtenerFirmantesPorDocumento(UUID documentId) {
+        // Validamos primero que el documento exista (opcional pero recomendado)
+        if (!documentRepository.existsById(documentId)) {
+            throw new RuntimeException("Documento no encontrado con el ID: " + documentId);
+        }
+
+        // Buscamos las transacciones de firma y las mapeamos a DTO
+        return transaccionFirmaRepository.findByDocumentId(documentId)
+                .stream()
+                .map(f -> new FirmanteResponseDTO(
+                        f.getUuid(),
+                        f.getNombreFirmante(),
+                        f.getEmailFirmante(),
+                        f.getOrden(),
+                        f.getEstado()
+                ))
+                .toList();
+    }
 }

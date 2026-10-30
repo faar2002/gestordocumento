@@ -1,7 +1,8 @@
 package developer.fullstack.gestordocumento.controller;
 
 import developer.fullstack.gestordocumento.dto.DocumentDTO;
-import developer.fullstack.gestordocumento.dto.DocumentUploadRequestDTO; 
+import developer.fullstack.gestordocumento.dto.DocumentUploadRequestDTO;
+import developer.fullstack.gestordocumento.dto.FirmanteResponseDTO;
 import developer.fullstack.gestordocumento.dto.PageResponseDTO;
 import developer.fullstack.gestordocumento.service.DocumentService;
 import org.springframework.core.io.Resource;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/documents")
@@ -77,7 +79,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.findAllPaginated(companyId, email, pageable));
     }
 
-   @GetMapping("/{id}/download")
+    @GetMapping("/{id}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable UUID id) {
         byte[] data = documentService.download(id);
         DocumentDTO metadata = documentService.findById(id);
@@ -111,5 +113,11 @@ public class DocumentController {
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + document.fileName() + "\"")
                 .body(fileBytes);
+    }
+
+    @GetMapping("/{id}/firmantes")
+    public ResponseEntity<List<FirmanteResponseDTO>> listarFirmantesPorDocumento(@PathVariable UUID id) {
+        List<FirmanteResponseDTO> firmantes = documentService.obtenerFirmantesPorDocumento(id);
+        return ResponseEntity.ok(firmantes);
     }
 }
